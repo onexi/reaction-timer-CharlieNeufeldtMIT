@@ -4,3 +4,6 @@ Starter Code for Reaction Timer
 Run npm install to install all dependencies 
 The above uses package.json to build the project
 Note .gitignore is set to ignore node_modules
+This system presents the user with a very simple reaction timer. After the start button is pressed the user waits for some amount of time between 1-20 seconds that is randomized for each trial. There is an indicator box that turns from “wait” to “go” to tell the user when the stop button should be pressed. If the stop button is pressed too quickly (impossibly fast for a human) then an error message occurs. Similarly, if the user clicks repeatedly, then an error message will explain that they clicked too soon and a countdown will prevent the user from clicking again for 3 seconds. The results are displayed below the reaction timer and the fastest time is updated after each trial. If someone completes multiple trials, their times are listed next to their name. 
+
+Fetch() is used to make requests to the server from the browser. The front end uses fetch() to send data like the name and reaction time of the user to the server for processing which is done through a POST request. When the server receives the POST request it processes the data.

@@ -1,2 +1,200 @@
 <!DOCTYPE html>
-<html lang="en"></html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reaction Timer</title>
+    <style>
+        #startButton, #stopButton {
+            padding: 10px 20px;
+            font-size: 18px;
+            margin: 10px;
+            cursor: pointer;
+        }
+        #stopButton {
+            display: none; /* Hidden initially */
+        }
+        #timerBox {
+            width: 200px;
+            height: 100px;
+            background-color: lightgray;
+            margin: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+        #errorMessage {
+            display: none;
+            color: red;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        #resultList {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Reaction Timer</h1>
+    
+    <label for="nameInput">Enter your name:</label>
+    <input type="text" id="nameInput" placeholder="Your name" />
+
+    <div id="timerContainer">
+        <div id="timerBox">Wait...</div>
+        <button id="startButton">Start</button>
+        <button id="stopButton">Stop</button>
+    </div>
+
+    <div id="errorMessage">You pressed too soon! Please wait for the green light.</div>
+
+    <div id="resultList">
+        <h2>Results</h2>
+        <ul id="results"></ul>
+        <h3>Fastest Time: <span id="fastestTime">None</span></h3>
+    </div>
+
+    <script>
+        let timeoutId;
+        let startTime;
+        let isRunning = false;
+        let allResults = {};
+        let fastestTime = null;
+
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        const timerBox = document.getElementById('timerBox');
+        const nameInput = document.getElementById('nameInput');
+        const resultsList = document.getElementById('results');
+        const fastestTimeDisplay = document.getElementById('fastestTime');
+        const errorMessage = document.getElementById('errorMessage');
+
+        startButton.addEventListener('click', () => {
+            const userName = nameInput.value.trim();
+            if (!userName) {
+                alert('Please enter your name');
+                return;
+            }
+
+            // Set random delay between 1 and 20 seconds
+            const randomDelay = Math.random() * 19000 + 1000;
+
+            // Hide Start button, show Stop button
+            startButton.style.display = 'none';
+            stopButton.style.display = 'inline-block';
+
+            // Hide the error message if it was shown previously
+            errorMessage.style.display = 'none';
+
+            // Set the timerBox to 'Wait...' and reset its background color
+            timerBox.textContent = 'Wait...';
+            timerBox.style.backgroundColor = 'lightgray';
+
+            // Set timeout for random time between 1 and 20 seconds
+            timeoutId = setTimeout(() => {
+                // Change background color after random delay
+                timerBox.style.backgroundColor = 'green';
+                timerBox.textContent = 'Go!';
+                startTime = new Date(); // Capture the time when color changes
+                isRunning = true;
+            }, randomDelay);
+        });
+
+        stopButton.addEventListener('click', () => {
+            const userName = nameInput.value.trim();
+            if (!userName) {
+                alert('Please enter your name');
+                return;
+            }
+
+            // Check if the user is pressing stop before "Go!" (before the green box appears)
+            if (!isRunning) {
+                // If the box hasn't turned green yet (meaning they pressed too early):
+                timerBox.textContent = 'Too soon! Try again.';
+                timerBox.style.backgroundColor = 'red'; // Show an error color
+                stopButton.style.display = 'none'; // Hide stop button
+                startButton.style.display = 'inline-block'; // Show Start button again
+                clearTimeout(timeoutId); // Clear timeout to stop any future event
+
+                // Show the error message
+                errorMessage.style.display = 'block';
+
+                // Add penalty: Disable both buttons for 3 seconds and show countdown
+                startButton.disabled = true;
+                stopButton.disabled = true;
+
+                let countdown = 3;
+                timerBox.textContent = `Wait ${countdown} seconds...`;
+
+                const countdownInterval = setInterval(() => {
+                    countdown--;
+                    timerBox.textContent = `Wait ${countdown} seconds...`;
+
+                    if (countdown === 0) {
+                        clearInterval(countdownInterval);
+                        // Re-enable the buttons after countdown is complete
+                        startButton.disabled = false;
+                        stopButton.disabled = false;
+                        timerBox.textContent = 'Ready...';
+                        timerBox.style.backgroundColor = 'lightgray'; // Reset to default state
+                        errorMessage.style.display = 'none'; // Hide the error message after countdown
+                    }
+                }, 1000); // Update every second for the countdown
+
+            } else {
+                // Calculate reaction time after the "Go!" signal
+                const reactionTime = new Date() - startTime; // Calculate reaction time
+                stopButton.style.display = 'none'; // Hide stop button after clicking
+                startButton.style.display = 'inline-block'; // Show Start button again
+                isRunning = false;
+
+                // Flag impossibly fast reaction times (e.g., less than 100ms)
+                if (reactionTime < 100) {
+                    timerBox.textContent = `Error: Too fast (${reactionTime} ms)!`;
+                    timerBox.style.backgroundColor = 'orange'; // Indicate error
+                    console.error(`Reaction time of ${reactionTime} ms is too fast to be valid.`);
+                
+                } else {
+                    // Save the result, grouping by user name
+                    if (!allResults[userName]) {
+                        allResults[userName] = [];
+                    }
+                    allResults[userName].push(reactionTime);
+
+                    // Update the display
+                    updateResults(userName, reactionTime);
+
+                    // Send the data to the server
+                    fetch('/save-time', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ name: userName, reactionTime: reactionTime })
+                    })
+                    .then(response => response.json())
+                    .then(data => console.log('Success:', data))
+                    .catch(error => console.error('Error:', error));
+                }
+            }
+        });
+
+
+        function updateResults(userName, reactionTime) {
+            // Update the results list
+            let resultListHTML = '';
+            for (const name in allResults) {
+                resultListHTML += `<li><strong>${name}</strong>: ${allResults[name].join(', ')} ms</li>`;
+            }
+            resultsList.innerHTML = resultListHTML;
+
+            // Update the fastest time
+            if (fastestTime === null || reactionTime < fastestTime) {
+                fastestTime = reactionTime;
+                fastestTimeDisplay.textContent = `${fastestTime} ms`;
+            }
+        }
+    </script>
+</body>
+</html>
